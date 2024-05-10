@@ -24,6 +24,7 @@ function moveSequence = genMoveSequence(CM,move, prevFen)
     % Start at home pose
 
     % If there was a capture, move that to the capture zone first
+    % Check for En passant (If a pawn moved diagonal into empty square)
     if destinationOccupant != 'e'
        % move occupant to relevant capture area
 
