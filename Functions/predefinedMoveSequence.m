@@ -1,4 +1,4 @@
-function moves = MoveSequence()
+function moves = predefinedMoveSequence()
     % Provides the list of moves given by the demonstration requirements
     % in long algebraid notation (LAN)
     %

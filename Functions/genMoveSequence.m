@@ -1,60 +1,98 @@
-function moveSequence = genMoveSequence(CM,move, prevFen)
-    % Generates the via points for trajectory generation
+function [moveSequence, boardState] = genMoveSequence(move, boardState)
+    % This function generates the via points for trajectory generation
+    
 
-    % Get current and prev engine board FEN (before and after most recent move)
-    currentFEN = CM.GetFENstr();
+    % Figure out piece typoe, starting position and ending position from boardstates
+    startPos = [double(move(2)) - 48, double(move(1)) - 96];
+    endPos = [double(move(4)) - 48, double(move(3)) - 96];
 
-    prevBoard = FEN2Board(prevFen)
-    currentBoard = FEN2Board(currentFEN)
+    movingPiece = boardState(startPos(1), startPos(2));
 
-    % Figure out piece typoe, starting position and ending position from
-    % boardstates
-    disp(class(move(1)))
-    disp(move(1))
-    disp(double(move(1)))
-    startpos = [double(move(2)) - 48, double(move(1)) - 96]
-    endpos = [double(move(4)) - 48, double(move(3)) - 96]
-
-    movingPiece = prevBoard(startpos(1), startpos(2));
-
-    destinationOccupant = prevBoard(endpos(1), endpos(2));
+    destinationOccupant = boardState(endPos(1), endPos(2));
 
     %%%% Generate Via Points %%%%
+    moveSequence = [];
 
     % Start at home pose
 
     % If there was a capture, move that to the capture zone first
     % Check for En passant (If a pawn moved diagonal into empty square)
-    if destinationOccupant ~= 'e'
-       % move occupant to relevant capture area
+    if destinationOccupant ~= 'e' || (destinationOccupant == 'e' && (movingPiece == 'p' || movingPiece == 'P') && abs(startPos(2) - endPos(2)) == 1)
+        % move occupant to relevant capture area
 
+        if destinationOccupant == 'e'
+            if double(movingPiece) < 97 % moving pawn is white
+                captureStart = [endPos(1)-1, endPos(2)];
+            else
+                captureStart = [endPos(1)+1, endPos(2)];
+            end
+        else
+            captureStart = endPos;
+        end
+        capturePiece = boardState(captureStart(1), captureStart(2));
+
+        captureEnd = findCaptureSpot(boardState, capturePiece);
+
+        % update captureArea
+        boardState(captureEnd(1), captureEnd(2)) = capturePiece;
+
+        captureSequence = genViaPoints(captureStart, captureEnd, capturePiece);
+        moveSequence = [moveSequence captureSequence];
     end
 
+
     % Move piece
-    % Go to location above piece
-    % Go to height of piece
-    % grip piece
-    % got to location above piece
-    % got to location above destination
-    % go down to height of piece
-    % release grip
-    % go to loaction above destination
+    moveSequence = [moveSequence genViaPoints(startPos, endPos, movingPiece)];
 
 
+    % if it was a castling move, move the castle
+    if (movingPiece == 'k' || movingPiece == 'K') && abs(startPos(2) - endPos(2)) == 2
+        if movingPiece == 'K' % white castle
+            if startPos(2) - endPos(2) == 2
+                castleStart = [1 1];
+                castleEnd = [1 4];
+            else
+                castleStart = [1 8];
+                castleEnd = [1 6];
+            end
+        else % black castle
+            if startPos(2) - endPos(2) == 2
+                castleStart = [8 1];
+                castleEnd = [8 4];
+            else
+                castleStart = [8 8];
+                castleEnd = [8 6];
+            end
+        end
+        castleSequence = genViaPoints(castleStart, castleEnd, 'r');
+        moveSequence = [moveSequence castleSequence];
 
-
-    % if it was a castling move, move the other piece
-    % if piece = 'k' or 'K' and destination is more than 1 square away
-    % move relevant castle next to the king
+    end
+    
 
     % If there was a promotion, move that back on to the board
     % if last char in move string isn't an integer
-    % move pawn off the board to capture area
-    % switch case for q, b, n, c
-    % find q, b, n, or c in relevant capture zone
-    % move that piece on to the board
+    %disp(move(end))
+    %disp(double(move(end)))
+    if double(move(end))  > 64 % we have a promotion
+        
+        captureEnd = findCaptureSpot(boardState,movingPiece);
 
-    % End at home pose
+        % update captureArea
+        boardState(captureEnd(1), captureEnd(2)) = movingPiece;
+        
+        promotionSequence1 = genViaPoints(startPos, captureEnd, movingPiece);
 
-    moveSequence = CM;
+        promotionStart = findPromotionPiece(boardState, move(end));
+
+
+
+        % update captureArea
+        boardState(promotionStart(1), promotionStart(2)) = 'e';
+
+        promotionSequence2 = genViaPoints(promotionStart, endPos, move(end));
+
+        moveSequence = [moveSequence promotionSequence1 promotionSequence2];
+
+    end
 end
